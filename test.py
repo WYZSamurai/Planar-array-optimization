@@ -1,54 +1,54 @@
-import torch
-import plotly.graph_objects as go
+import numpy as np
+import matplotlib.pyplot as plt
 
 
-def plot_array_pattern_with_plotly(m, n, d, wavelength=1.0, beam_direction=0):
-    # 转换波束指向角度为弧度
-    beam_direction_rad = beam_direction * torch.pi / 180
+def generate_array_factors(M, N, wavelength, d, theta0, phi0, theta_range, phi_range):
+    # 设定阵元位置
+    x = np.linspace(-M/2, M/2, M) * d
+    y = np.linspace(-N/2, N/2, N) * d
+    X, Y = np.meshgrid(x, y)
 
-    # 计算角度范围，这里将波束指向考虑在内
-    theta_range = torch.linspace(-90, 90, 100) * \
-        torch.pi / 180 + beam_direction_rad  # 仰角，-90到90度
-    phi_range = torch.linspace(-90, 90, 100) * torch.pi / 180  # 方位角，-90到90度
+    # 随机生成激励幅度和相位
+    A = np.random.rand(M, N)
+    phi = np.random.rand(M, N) * 2 * np.pi
 
-    theta, phi = torch.meshgrid(theta_range, phi_range, indexing='ij')
+    # 波数 k
+    k = 2 * np.pi / wavelength
 
-    # 计算方向矢量
-    u = torch.sin(theta) * torch.cos(phi)
-    v = torch.sin(theta) * torch.sin(phi)
+    # 方向图计算
+    AF = np.zeros((len(theta_range), len(phi_range)), dtype=complex)
 
-    # 计算阵列因子
-    af_m = torch.sin(m * torch.pi * d * u / wavelength) / \
-        (m * torch.sin(torch.pi * d * u / wavelength))
-    af_n = torch.sin(n * torch.pi * d * v / wavelength) / \
-        (n * torch.sin(torch.pi * d * v / wavelength))
-    af = af_m * af_n
+    for i, theta in enumerate(theta_range):
+        for j, phi in enumerate(phi_range):
+            phase_shift = k * (X * np.sin(theta) *
+                               np.cos(phi) + Y * np.sin(theta) * np.sin(phi))
+            AF[i, j] = np.sum(A * np.exp(1j * (phi - phase_shift)))
 
-    # 防止除以零的错误
-    af[torch.isnan(af)] = 0
-
-    # 转换为球坐标系以绘图
-    x = af * torch.sin(theta) * torch.cos(phi)
-    y = af * torch.sin(theta) * torch.sin(phi)
-    z = af * torch.cos(theta)
-
-    # 使用plotly绘图
-    fig = go.Figure(
-        data=[go.Surface(z=z.numpy(), x=x.numpy(), y=y.numpy(), colorscale='Viridis')])
-
-    fig.update_layout(title='3D Array Pattern with Beam Direction', autosize=False,
-                      width=800, height=800,
-                      margin=dict(l=65, r=50, b=65, t=90))
-
-    # 设置坐标轴范围
-    fig.update_layout(scene=dict(
-        xaxis=dict(nticks=4, range=[-1, 1],),
-        yaxis=dict(nticks=4, range=[-1, 1],),
-        zaxis=dict(nticks=4, range=[-1, 1],)),
-    )
-
-    fig.show()
+    return np.abs(AF)
 
 
-# 使用Plotly绘制m行n列的均匀平面阵列3D方向图，并指定波束指向
-plot_array_pattern_with_plotly(m=4, n=4, d=0.5, beam_direction=0)
+# 参数设定
+M = 10
+N = 10
+wavelength = 0.3  # 波长为0.3米
+d = 0.5  # 阵元间距为0.5米
+
+# 波束指向
+theta0 = np.pi / 4  # 45度
+phi0 = np.pi / 2    # 90度
+
+# 角度范围
+theta_range = np.linspace(0, np.pi, 180)
+phi_range = np.linspace(0, 2*np.pi, 360)
+
+# 计算方向图
+AF = generate_array_factors(
+    M, N, wavelength, d, theta0, phi0, theta_range, phi_range)
+
+# 可视化方向图
+theta, phi = np.meshgrid(np.degrees(theta_range), np.degrees(phi_range))
+fig, ax = plt.subplots(subplot_kw={'projection': 'polar'})
+contour = ax.contourf(phi, theta, AF.T, levels=50, cmap='viridis')
+fig.colorbar(contour, ax=ax, orientation='vertical')
+plt.title('Directional Pattern of the Array')
+plt.show()
