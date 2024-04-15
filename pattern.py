@@ -2,35 +2,76 @@ import torch
 import plotly.graph_objects as go
 
 
+# def pattern(mag: torch.Tensor, phase0: torch.Tensor, lamb: float, d: float, theta0: float, phi0: float, dt: int, dp: int):
+#     pi = torch.pi
+#     # (NP,m,n)
+#     _, m, n = mag.shape
+#     k = 2*pi/lamb
+#     theta0 = torch.tensor(theta0)*pi/180
+#     phi0 = torch.tensor(phi0)*pi/180
+
+#     phi = torch.linspace(-pi/2, pi/2, dp).reshape(1, dp).repeat(dt, 1)
+#     theta = torch.linspace(-pi/2, pi/2, dt).reshape(dt, 1).repeat(1, dp)
+
+#     # 构造角度矩阵 (dt, dp)
+#     ang1 = torch.cos(theta)*torch.sin(phi)-torch.cos(theta0)*torch.sin(phi0)
+#     ang2 = torch.sin(theta)-torch.sin(theta0)
+
+#     # 构造距离矩阵 (m, n)
+#     dm = k*d*torch.arange(0, m).reshape(m, 1).repeat(1, n)
+#     dn = k*d*torch.arange(0, n).reshape(1, n).repeat(m, 1)
+
+#     # 计算每个天线元的相位贡献(NP,m,n,dt,dp)
+#     phase_contributions = phase0.unsqueeze(3).unsqueeze(4) + dm.unsqueeze(2).unsqueeze(3).unsqueeze(0) * ang1.unsqueeze(
+#         0).unsqueeze(0).unsqueeze(0) + dn.unsqueeze(2).unsqueeze(3).unsqueeze(0) * ang2.unsqueeze(0).unsqueeze(0).unsqueeze(0)
+
+#     # 计算复数指数项
+#     complex_exponentials = torch.exp(torch.complex(
+#         torch.zeros_like(phase_contributions), phase_contributions))
+
+#     # 按天线元求和(NP,dt,dp)
+#     F = ((mag.unsqueeze(3).unsqueeze(4) * complex_exponentials).sum(dim=(1, 2))).abs()
+
+#     # 转换为分贝并进行归一化
+#     Fdb = 20 * torch.log10(F / F.max())
+#     return Fdb
+
+
 def pattern(mag: torch.Tensor, phase0: torch.Tensor, lamb: float, d: float, theta0: float, phi0: float, dt: int, dp: int):
     # phase(m,n)
     pi = torch.pi
-    (m, n) = mag.shape
+    m, n = mag.shape
     k = 2*pi/lamb
+
     theta0 = torch.tensor(theta0)*pi/180
     phi0 = torch.tensor(phi0)*pi/180
+
+    mag = mag.unsqueeze(2).unsqueeze(3)
+    phase0 = phase0.unsqueeze(2).unsqueeze(3)
 
     phi = torch.linspace(-pi/2, pi/2, dp).reshape(1, dp).repeat(dt, 1)
     theta = torch.linspace(-pi/2, pi/2, dt).reshape(dt, 1).repeat(1, dp)
 
     # 构造角度矩阵 (dt, dp)
-    ang1 = torch.cos(theta)*torch.sin(phi)-torch.cos(theta0)*torch.sin(phi0)
-    ang2 = torch.sin(theta)-torch.sin(theta0)
+    ang1 = torch.cos(theta)*torch.sin(phi)-torch.cos(theta0) * \
+        torch.sin(phi0).unsqueeze(0).unsqueeze(0)
+    ang2 = torch.sin(theta)-torch.sin(theta0).unsqueeze(0).unsqueeze(0)
 
     # 构造距离矩阵 (m, n)
-    dm = k*d*torch.arange(0, m).reshape(m, 1).repeat(1, n)
-    dn = k*d*torch.arange(0, n).reshape(1, n).repeat(m, 1)
+    dm = k*d*torch.arange(0, m).reshape(m, 1).repeat(1,
+                                                     n).unsqueeze(2).unsqueeze(3)
+    dn = k*d*torch.arange(0, n).reshape(1, n).repeat(m,
+                                                     1).unsqueeze(2).unsqueeze(3)
 
     # 计算每个天线元的相位贡献(m,n,dt,dp)
-    phase_contributions = phase0.unsqueeze(2).unsqueeze(3) + dm.unsqueeze(2).unsqueeze(
-        3) * ang1.unsqueeze(0).unsqueeze(0) + dn.unsqueeze(2).unsqueeze(3) * ang2.unsqueeze(0).unsqueeze(0)
+    phase_contributions = phase0 + dm * ang1 + dn * ang2
 
     # 计算复数指数项
     complex_exponentials = torch.exp(torch.complex(
         torch.zeros_like(phase_contributions), phase_contributions))
 
     # 按天线元求和
-    F = ((mag.unsqueeze(2).unsqueeze(3) * complex_exponentials).sum(dim=(0, 1))).abs()
+    F = ((mag * complex_exponentials).sum(dim=(0, 1))).abs()
 
     # 转换为分贝并进行归一化
     Fdb = 20 * torch.log10(F / F.max())
@@ -58,7 +99,3 @@ def plot(Fdb: torch.Tensor, dt: int, dp: int):
 
     # 显示图表
     fig.show()
-
-
-if __name__ == "__main__":
-    pass
