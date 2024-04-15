@@ -14,20 +14,26 @@ d = 0.5*lamb
 
 phi0 = 0.0
 theta0 = 0.0
-dp = 180
-dt = 180
+dp = 360
+dt = 360
 
 NP = 100
 m = 20
 n = 10
 
-mag = torch.randint(0, 2, (NP, m, n))
-# mag = torch.ones(NP, m, n)
-phase0 = torch.zeros_like(mag)
+
+# 生成dna
+dna = torch.randint(0, 2, (NP, m, n), device=device)
+# dna = torch.ones(NP, m, n, device=device)
+phase0 = torch.zeros_like(dna, device=dna.device)
+
+
+# 计算群体Fdb
 Fdb = torch.zeros(NP, dt, dp)
-print("循环开始。")
 for i in range(NP):
-    Fdb[i] = pattern.pattern(
-        mag[i], phase0[i], lamb, d, theta0, phi0, dt, dp)
-print("循环完成。")
-# pattern.plot(Fdb, dt, dp)
+    Fdb[i] = pattern.pattern(dna[i], phase0[i], lamb, d, theta0, phi0, dt, dp)
+# # 使用矩阵操作计算Fdb
+# Fdb = pattern.pattern_multiple(dna, phase0, lamb, d, theta0, phi0, dt, dp)
+
+
+pattern.plot(Fdb[0], dt, dp)
