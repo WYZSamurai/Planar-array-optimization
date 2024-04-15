@@ -3,6 +3,7 @@ import plotly.graph_objects as go
 
 
 def pattern(mag: torch.Tensor, phase0: torch.Tensor, lamb: float, d: float, theta0: float, phi0: float, dt: int, dp: int):
+    # phase(m,n)
     pi = torch.pi
     (m, n) = mag.shape
     k = 2*pi/lamb
@@ -12,40 +13,41 @@ def pattern(mag: torch.Tensor, phase0: torch.Tensor, lamb: float, d: float, thet
     phi = torch.linspace(-pi/2, pi/2, dp).reshape(1, dp).repeat(dt, 1)
     theta = torch.linspace(-pi/2, pi/2, dt).reshape(dt, 1).repeat(1, dp)
 
-    # a(dt,dp)
+    # 构造角度矩阵 (dt, dp)
     ang1 = torch.cos(theta)*torch.sin(phi)-torch.cos(theta0)*torch.sin(phi0)
     ang2 = torch.sin(theta)-torch.sin(theta0)
 
-    # d(m,n)
+    # 构造距离矩阵 (m, n)
     dm = k*d*torch.arange(0, m).reshape(m, 1).repeat(1, n)
     dn = k*d*torch.arange(0, n).reshape(1, n).repeat(m, 1)
 
-    # phase = phase0+dm*ang1+dn*ang2
-    # print(phase.shape)
+    # 计算每个天线元的相位贡献(m,n,dt,dp)
+    phase_contributions = phase0.unsqueeze(2).unsqueeze(3) + dm.unsqueeze(2).unsqueeze(
+        3) * ang1.unsqueeze(0).unsqueeze(0) + dn.unsqueeze(2).unsqueeze(3) * ang2.unsqueeze(0).unsqueeze(0)
 
-    F = torch.zeros(dt, dp)
-    for i in range(m):
-        for j in range(n):
-            # phase(dt,dp)
-            phase = phase0[i, j]+dm[i, j]*ang1+dn[i, j]*ang2
-            F = F+mag[i, j] * \
-                torch.exp(torch.complex(torch.zeros_like(phase), phase))
-    F = F.abs()
-    Fdb = 20*torch.log10(F/F.max())
+    # 计算复数指数项
+    complex_exponentials = torch.exp(torch.complex(
+        torch.zeros_like(phase_contributions), phase_contributions))
+
+    # 按天线元求和
+    F = ((mag.unsqueeze(2).unsqueeze(3) * complex_exponentials).sum(dim=(0, 1))).abs()
+
+    # 转换为分贝并进行归一化
+    Fdb = 20 * torch.log10(F / F.max())
+
     return Fdb
 
 
 def plot(Fdb: torch.Tensor, dt: int, dp: int):
-    pi = torch.pi
-    phi = torch.linspace(-pi/2, pi/2, dp)
-    theta = torch.linspace(-pi/2, pi/2, dt)
+    phi = torch.linspace(-90.0, 90.0, dp)
+    theta = torch.linspace(-90.0, 90.0, dt)
 
     torch.meshgrid(theta, phi, indexing='ij')
     fig = go.Figure(data=[go.Surface(z=Fdb, x=theta, y=phi)])
 
     # 更新图表布局
     fig.update_layout(
-        title="3D 表面图示例",
+        title="3D方向图",
         scene=dict(
             xaxis_title='theta',
             yaxis_title='phi',

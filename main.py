@@ -1,5 +1,4 @@
 import torch
-import test
 import pattern
 
 
@@ -14,7 +13,8 @@ if __name__ == "__main__":
 
     m = 20
     n = 10
-    mag = torch.randint(0, 2, (m, n))
+    # mag = torch.randint(0, 2, (m, n))
+    mag = torch.ones(m, n)
     phase0 = torch.zeros(m, n)
 
     Fdb = pattern.pattern(mag, phase0, lamb, d, theta0, phi0, dt, dp)
